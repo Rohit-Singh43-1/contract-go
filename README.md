@@ -90,6 +90,14 @@ Learn more:
   - Validate network-config schemas for on-premise deployments
   - Support CCRT, CCRV, and CCCO configurations
 
+- **Sealed Secret Management**
+  - Create sealed secrets for workload and environment configurations
+  - Automatic RSA key pair generation for encryption and signing
+  - AES-256-GCM encryption with RSA key wrapping
+  - RSA-SHA512 digital signatures for integrity
+  - JWS (JSON Web Signature) compact serialization format
+  - Compatible with Go crypto packages for decryption
+
 ## Installation
 
 ```bash
@@ -394,6 +402,61 @@ func main() {
     }
 
     fmt.Printf("%s\n", msg)
+}
+```
+
+### Seal Secrets
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+
+    "github.com/ibm-hyper-protect/contract-go/v2/common/utils"
+)
+
+func main() {
+    // Example 1: Seal a workload secret with auto-generated keys
+    result, err := utils.SealSecret(
+        "my-database-password",
+        utils.WorkloadSecret,
+        nil, // Auto-generate encryption key
+        nil, // Auto-generate signing key
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println("Sealed Secret:", result.SealedSecret)
+    fmt.Println("Decryption Key:", string(result.DecryptionKeyPEM))
+    fmt.Println("Verification Key:", string(result.VerificationKeyPEM))
+
+    // Example 2: Seal a secret with provided dummy certificates
+    dummyEncryptionKey := []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN
+OPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQR
+... (truncated for brevity)
+-----END RSA PRIVATE KEY-----`)
+
+    dummySigningKey := []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAabcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMN
+OPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQR
+... (truncated for brevity)
+-----END RSA PRIVATE KEY-----`)
+
+    result2, err := utils.SealSecret(
+        "my-api-key",
+        utils.EnvSecret,
+        dummyEncryptionKey, // Provide custom encryption key
+        dummySigningKey,    // Provide custom signing key
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println("Sealed Secret with Custom Keys:", result2.SealedSecret)
 }
 ```
 

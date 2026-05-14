@@ -44,6 +44,7 @@ The encryption process:
 - [Attestation Functions](#attestation-functions)
 - [Certificate Functions](#certificate-functions)
 - [Contract Functions](#contract-functions)
+- [Sealed Secret Functions](#sealed-secret-functions)
 - [Image Functions](#image-functions)
 - [Network Functions](#network-functions)
 - [Common Patterns](#common-patterns)
@@ -2045,6 +2046,251 @@ func main() {
 - `"failed while parsing the template toml"` - Error while parsing the template initdata toml file
 - `"failed while creating initdata.toml"` - Failed while replacing encrypted contract in initdata.toml file
 - `"failed while gzipping initdata"` - Failed while compressing the content of inidata.toml file
+
+
+---
+
+## Sealed Secret Functions
+
+### SealSecret
+
+Encrypts a secret using AES-256-GCM with RSA key wrapping and RSA-SHA512 signing for CCCO workload or environment configurations.
+
+**Package:** `github.com/ibm-hyper-protect/contract-go/v2/common/utils`
+
+**Signature:**
+```go
+func SealSecret(secret string, secretType SecretType, encryptionKeyPEM, signingKeyPEM []byte) (*SealedSecretResult, error)
+```
+
+**Parameters:**
+
+| Parameter | Type | Required/Optional | Description |
+|-----------|------|-------------------|-------------|
+| `secret` | `string` | Required | The plaintext secret to encrypt |
+| `secretType` | `SecretType` | Required | Either `WorkloadSecret` or `EnvSecret` - determines key IDs used in the sealed secret |
+| `encryptionKeyPEM` | `[]byte` | Optional | RSA private key for encryption (PEM format). If `nil`, generates new 2048-bit RSA key |
+| `signingKeyPEM` | `[]byte` | Optional | RSA private key for signing (PEM format). If `nil`, generates new 2048-bit RSA key |
+
+**Secret Types:**
+
+| Constant | Value | Key IDs Used |
+|----------|-------|--------------|
+| `WorkloadSecret` | `"workload"` | `workload_decrypt`, `workload_verify` |
+| `EnvSecret` | `"env"` | `env_decrypt`, `env_verify` |
+
+**Returns:**
+
+| Return | Type | Description |
+|--------|------|-------------|
+| `SealedSecretResult` | `*SealedSecretResult` | Contains sealed secret and keys |
+| Error | `error` | Error if encryption fails or inputs are invalid |
+
+**SealedSecretResult Structure:**
+
+```go
+type SealedSecretResult struct {
+    // SealedSecret is the encrypted secret in JWS compact serialization format
+    // Format: sealed.<header>.<payload>.<signature>
+    SealedSecret string
+    
+    // DecryptionKeyPEM is the RSA private key for decryption (PEM format)
+    // IMPORTANT: Store this securely - it's needed to decrypt the secret
+    DecryptionKeyPEM []byte
+    
+    // VerificationKeyPEM is the RSA public key for signature verification (PEM format)
+    VerificationKeyPEM []byte
+}
+```
+
+**Example 1: Generate New Keys (Recommended for New Secrets):**
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/ibm-hyper-protect/contract-go/v2/common/utils"
+)
+
+func main() {
+    // Secret to encrypt
+    secret := "my-database-password"
+
+    // Seal the secret - generates new keys automatically
+    result, err := utils.SealSecret(secret, utils.WorkloadSecret, nil, nil)
+    if err != nil {
+        log.Fatalf("Failed to seal secret: %v", err)
+    }
+
+    fmt.Printf("Sealed Secret:\n%s\n\n", result.SealedSecret)
+    
+    // IMPORTANT: Save the decryption key securely
+    err = os.WriteFile("decryption-key.pem", result.DecryptionKeyPEM, 0600)
+    if err != nil {
+        log.Fatalf("Failed to save decryption key: %v", err)
+    }
+    
+    // Save verification key (can be shared publicly)
+    err = os.WriteFile("verification-key.pem", result.VerificationKeyPEM, 0644)
+    if err != nil {
+        log.Fatalf("Failed to save verification key: %v", err)
+    }
+
+    fmt.Println("Keys saved successfully!")
+    fmt.Println("Use the sealed secret in your contract")
+}
+```
+
+**Example 2: Use Existing Keys:**
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/ibm-hyper-protect/contract-go/v2/common/utils"
+)
+
+func main() {
+    // Read existing keys
+    encryptionKey, err := os.ReadFile("encryption-private-key.pem")
+    if err != nil {
+        log.Fatalf("Failed to read encryption key: %v", err)
+    }
+
+    signingKey, err := os.ReadFile("signing-private-key.pem")
+    if err != nil {
+        log.Fatalf("Failed to read signing key: %v", err)
+    }
+
+    // Seal secret with existing keys
+    secret := "my-api-token"
+    result, err := utils.SealSecret(secret, utils.EnvSecret, encryptionKey, signingKey)
+    if err != nil {
+        log.Fatalf("Failed to seal secret: %v", err)
+    }
+
+    fmt.Printf("Sealed Secret:\n%s\n", result.SealedSecret)
+}
+```
+
+**Example 3: Seal Multiple Secrets with Same Keys:**
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+
+    "github.com/ibm-hyper-protect/contract-go/v2/common/utils"
+)
+
+func main() {
+    // Generate keys once
+    firstResult, err := utils.SealSecret("first-secret", utils.WorkloadSecret, nil, nil)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Reuse the same keys for additional secrets
+    secondResult, err := utils.SealSecret(
+        "second-secret",
+        utils.WorkloadSecret,
+        firstResult.DecryptionKeyPEM,
+        firstResult.DecryptionKeyPEM, // Can use same key for both encryption and signing
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("First Sealed Secret:\n%s\n\n", firstResult.SealedSecret)
+    fmt.Printf("Second Sealed Secret:\n%s\n", secondResult.SealedSecret)
+}
+```
+
+**Example 4: Using Sealed Secrets in Contracts:**
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+
+    "github.com/ibm-hyper-protect/contract-go/v2/common/utils"
+)
+
+func main() {
+    // Seal database password for workload
+    dbPassword := "super-secret-db-password"
+    workloadResult, err := utils.SealSecret(dbPassword, utils.WorkloadSecret, nil, nil)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Seal API key for environment
+    apiKey := "my-api-key-12345"
+    envResult, err := utils.SealSecret(apiKey, utils.EnvSecret, nil, nil)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+}
+```
+
+**Sealed Secret Format:**
+
+The sealed secret uses JWS (JSON Web Signature) compact serialization format:
+
+```
+sealed.<header>.<payload>.<signature>
+```
+
+Where:
+- **Header**: Base64URL-encoded JSON containing algorithm (`RS512`) and key ID
+- **Payload**: Base64URL-encoded JSON envelope with encrypted data and metadata
+- **Signature**: Base64URL-encoded RSA-SHA512 signature
+
+**Encryption Process:**
+
+1. Generate random 32-byte AES-256 key
+2. Generate random 12-byte initialization vector (IV)
+3. Encrypt secret with AES-256-GCM using key and IV
+4. Encrypt AES key with RSA-PKCS1v15 using public key
+5. Create JSON envelope with encrypted data and key
+6. Sign envelope with RSA-SHA512 using private key
+7. Construct JWS format with header, payload, and signature
+
+**Security Features:**
+
+- **AES-256-GCM**: Authenticated encryption with associated data (AEAD)
+- **RSA Key Wrapping**: Secure key exchange using RSA-PKCS1v15
+- **RSA-SHA512 Signing**: Strong signature algorithm for integrity verification
+- **JWS Format**: Industry-standard format for signed data
+
+**Use Cases:**
+
+- Enables sealing of k8s/OCP secrets
+- Supports secrets both in Env and Workload section of CCCO contract
+
+
+**Common Errors:**
+
+- `"secret cannot be empty"` - Secret parameter is empty
+- `"invalid secret type: must be WorkloadSecret or EnvSecret"` - Invalid secretType value
+- `"failed to extract public key from encryption private key"` - Invalid encryption key format
+- `"failed to extract public key from signing private key"` - Invalid signing key format
+- `"failed to generate encryption key pair"` - Key generation failed
+- `"failed to generate signing key pair"` - Key generation failed
+- `"failed to encrypt secret"` - Encryption operation failed
 
 
 ### HpcrVerifyNetworkConfig
