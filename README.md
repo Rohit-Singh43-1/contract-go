@@ -115,6 +115,13 @@ Learn more:
   - JWS (JSON Web Signature) compact serialization format
   - Compatible with Go crypto packages for decryption
 
+- **OpenSSL Key and Certificate Generation**
+  - Generate RSA key pairs (`2048`, `3072`, or `4096` bit) using the system OpenSSL binary
+  - Generate CA + client certificate bundles with custom SANs and validity periods
+  - Optional AES-256 passphrase encryption for private keys (passphrase delivered via fd pipe)
+  - SHA-256 checksums returned for every generated artifact
+  - Compatible with OpenSSL 3.x (PKCS#8 key format)
+
 - **Rego Policy Generation**
   - Generate OPA v1 Rego policy from a Kubernetes pod YAML (Pod, Deployment, StatefulSet, DaemonSet, CronJob)
   - Automatically extract container images and commands to generate `allow_image()` and `allow_command()` rules
@@ -559,6 +566,61 @@ MIIEpAIBAAKCAQEA...
     }
 
     fmt.Println("Sealed Secret with Custom Keys:", sealedSecret2)
+}
+```
+
+### Generate OpenSSL Keys and Certificates
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/ibm-hyper-protect/contract-go/v2/opensslkeycert"
+)
+
+func main() {
+    // Example 1: Generate a 4096-bit RSA key pair with a passphrase
+    privPEM, pubPEM, _, _, _, privSha, pubSha, _, _, _, err := opensslkeycert.GenerateOpenSSLArtifacts(
+        "key",
+        "my-passphrase",
+        "",   // commonName — not used for key type
+        "",   // sans — not used for key type
+        4096,
+        0,    // validDays — not used for key type
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println("Private Key SHA256:", privSha)
+    fmt.Println("Public Key SHA256:", pubSha)
+    os.WriteFile("mykey_private.pem", []byte(privPEM), 0600)
+    os.WriteFile("mykey_public.pub", []byte(pubPEM), 0644)
+
+    // Example 2: Generate a CA + client certificate bundle
+    _, _, caCertPEM, clientCertPEM, clientKeyPEM, _, _, caSha, clientCertSha, clientKeySha, err :=
+        opensslkeycert.GenerateOpenSSLArtifacts(
+            "cert",
+            "",                          // no password on client key
+            "my-service",               // commonName
+            "example.com,192.168.1.10", // SANs (DNS and IP auto-typed)
+            2048,
+            365,
+        )
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println("CA Cert SHA256:", caSha)
+    fmt.Println("Client Cert SHA256:", clientCertSha)
+    fmt.Println("Client Key SHA256:", clientKeySha)
+    os.WriteFile("ca.crt", []byte(caCertPEM), 0644)
+    os.WriteFile("client.crt", []byte(clientCertPEM), 0644)
+    os.WriteFile("client_private.pem", []byte(clientKeyPEM), 0600)
 }
 ```
 
