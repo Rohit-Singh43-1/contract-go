@@ -125,6 +125,13 @@ Learn more:
   - Returns plain policy string, Base64 of input pod YAML, and Base64 of generated policy
   - Compatible with IBM Kata Agent Policy enforcement in Confidential Computing environments
 
+- **Image Spec Generation**
+  - Fetch OCI image config from any registry (public or private)
+  - Generate Kubernetes pod YAML snippet with correct `env`, `command`, `args`, `securityContext`, and `ports`
+  - Designed for use with `registryMapping` in confidential-containers workload contracts
+  - Auto-derives container name from image reference when not specified
+  - Returns SHA256 checksums of input and output for auditability
+
 ## Installation
 
 ```bash
@@ -597,6 +604,48 @@ func main() {
 
 > **Note:** Pass an empty string `""` as `templatePath` to use the embedded default OPA v1 template.
 > Provide a custom file path to use your own Rego template with the generator marker.
+
+### Generate a Pod YAML Spec from an OCI Image
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+
+    "github.com/ibm-hyper-protect/contract-go/v2/imagespec"
+)
+
+func main() {
+    // Public image — container name auto-derived
+    yaml, imageUser, inputSHA, outputSHA, err := imagespec.HpccGenerateImageSpec(
+        "quay.io/sclorg/postgresql-15-c9s:latest",
+        "",  // empty → derived from image reference
+        "",  // no credentials needed
+        "",
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(yaml)
+    fmt.Println("Image user:   ", imageUser)
+    fmt.Println("Input SHA256: ", inputSHA)
+    fmt.Println("Output SHA256:", outputSHA)
+
+    // Private registry
+    yaml, _, _, _, err = imagespec.HpccGenerateImageSpec(
+        "us.icr.io/my-ns/my-app:latest",
+        "my-app",
+        "iamapikey",
+        "<API_KEY>",
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(yaml)
+}
+```
 
 ## Documentation
 
