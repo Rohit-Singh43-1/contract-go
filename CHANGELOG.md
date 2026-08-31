@@ -1,3 +1,7 @@
+## <small>2.42.1 (2026-08-31)</small>
+
+* fix(deps): update module github.com/google/go-containerregistry to v0.22.0 (#307) ([4617869](https://github.com/ibm-hyper-protect/contract-go/commit/4617869)), closes [#307](https://github.com/ibm-hyper-protect/contract-go/issues/307)
+
 ## 2.42.0 (2026-08-31)
 
 * feat: add imagespec package for RegistryMapping (#298) ([92fc8d1](https://github.com/ibm-hyper-protect/contract-go/commit/92fc8d1)), closes [#298](https://github.com/ibm-hyper-protect/contract-go/issues/298)
