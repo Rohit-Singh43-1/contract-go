@@ -1,3 +1,7 @@
+## <small>2.43.1 (2026-09-04)</small>
+
+* fix(deps): update module github.com/google/go-containerregistry to v0.22.1 (#310) ([f64ac2d](https://github.com/ibm-hyper-protect/contract-go/commit/f64ac2d)), closes [#310](https://github.com/ibm-hyper-protect/contract-go/issues/310)
+
 ## 2.43.0 (2026-09-03)
 
 * feat: Add CCRV 26.9.0 encryption certificate (#309) ([a6c6f7d](https://github.com/ibm-hyper-protect/contract-go/commit/a6c6f7d)), closes [#309](https://github.com/ibm-hyper-protect/contract-go/issues/309)
