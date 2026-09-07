@@ -2641,7 +2641,7 @@ Where:
 
 Generates an RSA key pair or a CA + client certificate bundle using the system OpenSSL binary.
 
-**Package:** `github.com/ibm-hyper-protect/contract-go/v2/opensslkeycert`
+**Package:** `github.com/ibm-hyper-protect/contract-go/v2/crypto`
 
 **Signature:**
 ```go
@@ -2704,12 +2704,12 @@ import (
     "log"
     "os"
 
-    "github.com/ibm-hyper-protect/contract-go/v2/opensslkeycert"
+    "github.com/ibm-hyper-protect/contract-go/v2/crypto"
 )
 
 func main() {
     // Generate a 4096-bit RSA key pair, password-protected
-    privPEM, pubPEM, _, _, _, privSha, pubSha, _, _, _, err := opensslkeycert.GenerateOpenSSLArtifacts(
+    privPEM, pubPEM, _, _, _, privSha, pubSha, _, _, _, err := crypto.GenerateOpenSSLArtifacts(
         "key",
         "my-passphrase",
         "",   // commonName — not used for key type
@@ -2729,7 +2729,7 @@ func main() {
         log.Fatal(err)
     }
     // Save public key
-    if err = os.WriteFile("mykey_public.pub", []byte(pubPEM), 0644); err != nil {
+    if err = os.WriteFile("mykey_public.pem", []byte(pubPEM), 0644); err != nil {
         log.Fatal(err)
     }
 
@@ -2747,13 +2747,13 @@ import (
     "log"
     "os"
 
-    "github.com/ibm-hyper-protect/contract-go/v2/opensslkeycert"
+    "github.com/ibm-hyper-protect/contract-go/v2/crypto"
 )
 
 func main() {
     // Generate a 2048-bit cert bundle valid for 365 days
     _, _, caCertPEM, clientCertPEM, clientKeyPEM, _, _, caSha, clientCertSha, clientKeySha, err :=
-        opensslkeycert.GenerateOpenSSLArtifacts(
+        crypto.GenerateOpenSSLArtifacts(
             "cert",
             "",                              // no password on client key
             "my-service",                    // commonName
